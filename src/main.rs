@@ -1,5 +1,9 @@
-use std::sync::{Arc, Barrier};
+use std::{
+    hint::black_box,
+    sync::{Arc, Barrier},
+};
 
+use bytesize::ByteSize;
 use memory_stats::{memory_stats, MemoryStats};
 
 fn main() {
@@ -17,8 +21,14 @@ fn main() {
 
 fn report_usage(name: &str, usage_per_thread: MemoryStats) {
     println!("=== Memory usage per thread : {} ===", name);
-    println!("  Physical: {:>10}", usage_per_thread.physical_mem);
-    println!("   Virtual: {:>10}", usage_per_thread.virtual_mem);
+    println!(
+        "  Physical: {:>10}",
+        ByteSize::b(usage_per_thread.physical_mem as u64)
+    );
+    println!(
+        "   Virtual: {:>10}",
+        ByteSize::b(usage_per_thread.virtual_mem as u64)
+    );
 }
 
 fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> MemoryStats {
@@ -32,6 +42,7 @@ fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> MemoryStats
         let handle = std::thread::spawn(move || f(barrier));
         handles.push(handle);
     }
+    barrier.wait();
     let usage_after = memory_stats().unwrap();
 
     barrier.wait();
@@ -49,8 +60,10 @@ fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> MemoryStats
 
 fn small_thread(barrier: Arc<Barrier>) {
     barrier.wait();
+    barrier.wait();
 }
 fn large_thread<const S: usize>(barrier: Arc<Barrier>) {
-    let _blob: [u8; S] = [0; S];
+    let _: [u8; S] = black_box([0; S]);
+    barrier.wait();
     barrier.wait();
 }
