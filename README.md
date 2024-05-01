@@ -9,11 +9,8 @@ In this demo I show that OS never allocates space in physical memory until appli
 
 ```console
 $ cargo run --release
-                                      VIRTUAL   PHYSICAL
-  ------------------------------   ---------- ----------
-                    small_thread :     2.3 MB    16.6 KB
-            small_thread (after) :     1.0 KB      262 B
-
-               large_thread (1M) :     2.3 MB     1.1 MB
-         large_thread (1M) after :     9.4 KB      229 B
+                                              VIRT   VIRT (thread)   PHYS (thread)
+  ------------------------------   --------------- --------------- ---------------
+                    small_thread :       1073.9 GB          1.1 GB         16.7 KB
+               large_thread (1M) :       1073.9 GB          1.1 GB          1.1 MB
 ```
