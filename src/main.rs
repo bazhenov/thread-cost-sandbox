@@ -1,10 +1,9 @@
+use bytesize::ByteSize;
+use memory_stats::{memory_stats, MemoryStats};
 use std::{
     hint::black_box,
     sync::{Arc, Barrier},
 };
-
-use bytesize::ByteSize;
-use memory_stats::{memory_stats, MemoryStats};
 
 fn main() {
     const THREADS: usize = 1000;
