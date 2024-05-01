@@ -1,0 +1,25 @@
+name: Test
+
+on: push
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+  test:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+          - os: macos-11
+          - os: windows-2019
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run
+        run: cargo run --release
