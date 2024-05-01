@@ -64,9 +64,9 @@ fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> (MemoryStat
     )
 }
 
-fn difference(usage_during: MemoryStats, usage_before: MemoryStats, threads: usize) -> MemoryStats {
-    let physical_mem = (usage_during.physical_mem - usage_before.physical_mem) / threads;
-    let virtual_mem = (usage_during.virtual_mem - usage_before.virtual_mem) / threads;
+fn difference(a: MemoryStats, b: MemoryStats, threads: usize) -> MemoryStats {
+    let physical_mem = (a.physical_mem.saturating_sub(b.physical_mem)) / threads;
+    let virtual_mem = (a.virtual_mem.saturating_sub(b.virtual_mem)) / threads;
     MemoryStats {
         physical_mem,
         virtual_mem,
