@@ -12,27 +12,31 @@ fn main() {
     // Warmup
     measure_memory_per_thread(THREADS, small_thread);
 
-    let usage = measure_memory_per_thread(THREADS, small_thread);
-    report_usage("small_thread", usage);
+    println!("  {:>30}   {:>10} {:>10}", "", "VIRTUAL", "PHYSICAL");
+    println!("  {:->30}   {:->10} {:->10}", "", "", "");
 
-    let usage = measure_memory_per_thread(THREADS, large_thread::<{ 1024 * 1024 }>);
-    report_usage("large_thread (1M)", usage);
+    let (usage_during, usage_after) = measure_memory_per_thread(THREADS, small_thread);
+    report_usage("small_thread", usage_during);
+    report_usage("small_thread (after)", usage_after);
+    println!();
+
+    let (usage_during, usage_after) =
+        measure_memory_per_thread(THREADS, large_thread::<{ 1024 * 1024 }>);
+    report_usage("large_thread (1M)", usage_during);
+    report_usage("large_thread (1M) after", usage_after);
 }
 
 fn report_usage(name: &str, usage_per_thread: MemoryStats) {
-    println!("=== Memory usage per thread : {} ===", name);
     println!(
-        "  Physical: {:>10}",
+        "  {:>30} : {:>10} {:>10}",
+        name,
+        ByteSize::b(usage_per_thread.virtual_mem as u64),
         ByteSize::b(usage_per_thread.physical_mem as u64)
-    );
-    println!(
-        "   Virtual: {:>10}",
-        ByteSize::b(usage_per_thread.virtual_mem as u64)
     );
 }
 
-fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> MemoryStats {
-    // Inclusing outselves in waiting group to be able to block thread in running state
+fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> (MemoryStats, MemoryStats) {
+    // Including outselves in waiting group to be able to block thread in running state
     let barrier = Arc::new(Barrier::new(threads + 1));
     let mut handles = vec![];
 
@@ -42,16 +46,27 @@ fn measure_memory_per_thread(threads: usize, f: fn(Arc<Barrier>)) -> MemoryStats
         let handle = std::thread::spawn(move || f(barrier));
         handles.push(handle);
     }
-    barrier.wait();
-    let usage_after = memory_stats().unwrap();
 
+    // For measurements to be precise we need for tested function to wait on barrier twice.
+    // This way we can measure memory usage at all threads being at precise the same place in code.
     barrier.wait();
+    let usage_during = memory_stats().unwrap();
+    barrier.wait();
+
     for handle in handles.into_iter() {
         handle.join().unwrap();
     }
+    let usage_after = memory_stats().unwrap();
 
-    let physical_mem = (usage_after.physical_mem - usage_before.physical_mem) / threads;
-    let virtual_mem = (usage_after.virtual_mem - usage_before.virtual_mem) / threads;
+    (
+        difference(usage_during, usage_before, threads),
+        difference(usage_after, usage_before, threads),
+    )
+}
+
+fn difference(usage_during: MemoryStats, usage_before: MemoryStats, threads: usize) -> MemoryStats {
+    let physical_mem = (usage_during.physical_mem - usage_before.physical_mem) / threads;
+    let virtual_mem = (usage_during.virtual_mem - usage_before.virtual_mem) / threads;
     MemoryStats {
         physical_mem,
         virtual_mem,
@@ -63,7 +78,12 @@ fn small_thread(barrier: Arc<Barrier>) {
     barrier.wait();
 }
 fn large_thread<const S: usize>(barrier: Arc<Barrier>) {
-    let _: [u8; S] = black_box([0; S]);
+    large_allocate::<S>();
     barrier.wait();
     barrier.wait();
+}
+
+#[inline(never)]
+fn large_allocate<const S: usize>() {
+    black_box([0u8; S]);
 }
